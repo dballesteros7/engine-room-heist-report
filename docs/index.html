@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A simulation-based Pathfinder 2e balance report for the Engine Room Heist encounter.">
+  <meta name="theme-color" content="#0d2022">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="The Engine Room Heist — PF2e Encounter Balance Report">
+  <meta property="og:description" content="20,000 simulated fights per scenario show that the four-PC encounter behaves like an Extreme threat, not Severe.">
+  <meta property="og:url" content="https://dballesteros7.github.io/moa-toa-chronicles/">
+  <title>The Engine Room Heist — Encounter Balance Report</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #071b28;
+      --bg-deep: #04131c;
+      --panel: #0f2b39;
+      --panel-2: #173b48;
+      --text: #f8f1dd;
+      --muted: #b9c7c6;
+      --gold: #f3c95b;
+      --cyan: #72f7ff;
+      --pink: #ff82dc;
+      --danger: #ff6b6b;
+      --clean: #62d6a6;
+      --strained: #f0b95a;
+      --border: #526f73;
+      --shadow: rgba(0, 0, 0, 0.3);
+      --max: 70rem;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 15% 0%, rgba(114, 247, 255, 0.13), transparent 28rem),
+        radial-gradient(circle at 85% 5%, rgba(255, 130, 220, 0.1), transparent 26rem),
+        linear-gradient(180deg, var(--bg), var(--bg-deep));
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.65;
+    }
+    a { color: var(--cyan); text-underline-offset: 0.18em; }
+    a:hover { color: var(--gold); }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    button:focus-visible, a:focus-visible, summary:focus-visible {
+      outline: 3px solid var(--cyan);
+      outline-offset: 3px;
+    }
+
+    .site-shell { width: min(100% - 2rem, var(--max)); margin: 0 auto; }
+    .hero { padding: 4.5rem 0 2.7rem; }
+    .eyebrow {
+      margin: 0 0 0.65rem;
+      color: var(--cyan);
+      font: 700 0.78rem/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; line-height: 1.15; }
+    h1 { max-width: 13ch; margin: 0; font-size: clamp(2.5rem, 8vw, 5.7rem); letter-spacing: -0.045em; }
+    h2 { margin: 0 0 1rem; font-size: clamp(1.8rem, 4vw, 2.7rem); }
+    h3 { margin: 0 0 0.45rem; font-size: 1.25rem; }
+    .lede { max-width: 48rem; margin: 1.25rem 0 1.4rem; color: var(--muted); font-size: 1.1rem; }
+    .verdict {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      margin: 0.2rem 0 1.6rem;
+      border: 1px solid color-mix(in srgb, var(--danger), transparent 25%);
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--danger), transparent 86%);
+      color: var(--text);
+      padding: 0.48rem 0.78rem;
+      font-weight: 750;
+      letter-spacing: 0.035em;
+      text-transform: uppercase;
+    }
+    .verdict::before { content: ""; width: 0.65rem; height: 0.65rem; border-radius: 50%; background: var(--danger); box-shadow: 0 0 0 0.3rem color-mix(in srgb, var(--danger), transparent 82%); }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+    .share-button {
+      appearance: none;
+      border: 1px solid var(--gold);
+      border-radius: 0.45rem;
+      background: var(--gold);
+      color: #172026;
+      padding: 0.67rem 0.9rem;
+      font: inherit;
+      font-weight: 750;
+      cursor: pointer;
+      box-shadow: 0 0.3rem 0 var(--shadow);
+    }
+    .share-button:hover { transform: translateY(-1px); }
+    .share-status { min-height: 1.4em; color: var(--muted); font-size: 0.9rem; }
+
+    .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.8rem; margin: 2.5rem 0 0; }
+    .stat { border-top: 2px solid var(--border); padding: 1rem 0.2rem 0; }
+    .stat strong { display: block; color: var(--gold); font: 500 clamp(2rem, 5vw, 3.2rem)/1 Georgia, serif; }
+    .stat span { display: block; margin-top: 0.45rem; color: var(--muted); }
+
+    main { padding-bottom: 4rem; }
+    section { padding: 3rem 0; border-top: 1px solid color-mix(in srgb, var(--border), transparent 35%); }
+    .section-intro { max-width: 49rem; color: var(--muted); }
+    .split { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: clamp(1.5rem, 5vw, 4.5rem); align-items: start; }
+    .callout {
+      border-left: 0.35rem solid var(--danger);
+      background: color-mix(in srgb, var(--panel), transparent 8%);
+      padding: 1rem 1.15rem;
+    }
+    .callout strong { color: var(--gold); }
+    .snapshot { width: 100%; border-collapse: collapse; font-size: 0.94rem; }
+    .snapshot th, .snapshot td { border-bottom: 1px solid var(--border); padding: 0.65rem 0.4rem; text-align: left; vertical-align: top; }
+    .snapshot th { color: var(--gold); font-weight: 700; }
+    .snapshot td:last-child, .snapshot th:last-child { text-align: right; }
+
+    .chart-legend { display: flex; flex-wrap: wrap; gap: 0.65rem 1.15rem; margin: 1.3rem 0 1.6rem; color: var(--muted); font-size: 0.9rem; }
+    .legend-key { display: inline-flex; align-items: center; gap: 0.42rem; }
+    .swatch { width: 0.8rem; height: 0.8rem; border-radius: 0.18rem; }
+    .swatch.clean, .bar-clean { background: var(--clean); }
+    .swatch.strained, .bar-strained { background: var(--strained); }
+    .swatch.loss, .bar-loss { background: var(--danger); }
+    .scenario { margin: 0 0 1.45rem; }
+    .scenario-name { margin-bottom: 0.45rem; font-weight: 750; }
+    .chart-row { display: grid; grid-template-columns: 7.2rem minmax(10rem, 1fr) 6.3rem; gap: 0.7rem; align-items: center; margin: 0.35rem 0; font-size: 0.88rem; }
+    .bar { display: flex; height: 1.2rem; overflow: hidden; border-radius: 0.35rem; background: var(--panel-2); }
+    .bar > span { min-width: 0; height: 100%; }
+    .loss-label { text-align: right; font-weight: 750; }
+    .chart-note { max-width: 48rem; margin-top: 1.1rem; color: var(--muted); font-size: 0.9rem; }
+
+    .reason-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin-top: 1.6rem; }
+    .reason { border-top: 2px solid var(--cyan); padding-top: 1rem; }
+    .reason-number { color: var(--pink); font: 700 0.78rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: 0.08em; }
+    .reason p { margin-bottom: 0; color: var(--muted); }
+    .impact {
+      margin-top: 2rem;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--panel), transparent 8%);
+      padding: 1rem 1.2rem;
+    }
+    .impact strong { color: var(--gold); }
+
+    .recommendations { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1.4rem; }
+    .recommendation { border-top: 3px solid var(--gold); background: color-mix(in srgb, var(--panel), transparent 12%); padding: 1.15rem; }
+    .recommendation p { color: var(--muted); }
+    .recommendation ul { margin-bottom: 0; padding-left: 1.2rem; }
+    .recommendation li + li { margin-top: 0.4rem; }
+    .outcome { display: inline-block; border-radius: 999px; background: color-mix(in srgb, var(--cyan), transparent 86%); color: var(--cyan); padding: 0.25rem 0.55rem; font-size: 0.8rem; font-weight: 750; }
+
+    details { margin-top: 1.2rem; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 0.8rem 0; }
+    summary { cursor: pointer; color: var(--gold); font-weight: 750; }
+    details ul { color: var(--muted); }
+    .timing-note { border-left-color: var(--pink); }
+
+    footer { border-top: 1px solid var(--border); padding: 2rem 0 3.5rem; color: var(--muted); font-size: 0.88rem; }
+    footer p { max-width: 50rem; }
+    .source-links { display: flex; flex-wrap: wrap; gap: 0.5rem 1.2rem; }
+
+    @media (max-width: 760px) {
+      .hero { padding-top: 3rem; }
+      .stats, .reason-grid, .recommendations, .split { grid-template-columns: 1fr; }
+      .stats { gap: 1.2rem; }
+      .stat { display: grid; grid-template-columns: 5rem 1fr; align-items: center; gap: 0.7rem; }
+      .stat span { margin: 0; }
+      .chart-row { grid-template-columns: 5.6rem minmax(6rem, 1fr) 5.4rem; gap: 0.45rem; }
+    }
+    @media (max-width: 440px) {
+      .site-shell { width: min(100% - 1.15rem, var(--max)); }
+      .chart-row { grid-template-columns: 1fr 4.8rem; }
+      .chart-row > :first-child { grid-column: 1 / -1; }
+      .bar { grid-column: 1; }
+      .loss-label { grid-column: 2; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .share-button:hover { transform: none; } }
+    @media print {
+      :root { color-scheme: light; --bg: #fff; --bg-deep: #fff; --panel: #f3f3f3; --panel-2: #ddd; --text: #111; --muted: #444; --border: #777; --shadow: transparent; }
+      body { background: #fff; }
+      .hero { padding-top: 1rem; }
+      .share-button, .share-status { display: none; }
+      section { break-inside: avoid; }
+      a { color: #111; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero site-shell">
+    <p class="eyebrow">PF2e encounter audit // Engine Room Heist</p>
+    <h1>How deadly is the engine room?</h1>
+    <p class="lede">A simulation-based balance report for four level-4 player characters. The short version: the fight is winnable, but it behaves like an even contest rather than a Severe encounter the party is expected to survive.</p>
+    <div class="verdict">Extreme threat as written</div>
+    <div class="hero-actions">
+      <button class="share-button" id="share-report" type="button">Share this report</button>
+      <span class="share-status" id="share-status" aria-live="polite"></span>
+    </div>
+
+    <div class="stats" aria-label="Key simulation results">
+      <div class="stat"><strong>46%</strong><span>Party victory with focused target selection</span></div>
+      <div class="stat"><strong>35%</strong><span>Party victory when the group focuses Wang</span></div>
+      <div class="stat"><strong>60%</strong><span>Chance Wang acts before at least three PCs</span></div>
+    </div>
+  </header>
+
+  <main class="site-shell">
+    <section aria-labelledby="verdict-heading">
+      <div class="split">
+        <div>
+          <h2 id="verdict-heading">The verdict</h2>
+          <p>The listed enemies do not merely exceed a Severe XP budget. Their abilities reinforce one another in play: Wang frequently opens before the party, three enemies can produce area damage in the first round, and the fire-based arena is far more dangerous to the PCs than to its defenders.</p>
+          <div class="callout"><strong>Bottom line:</strong> a competent, fully rested party won approximately 46% of modeled fights. That is close to an even match—the practical signature of an Extreme encounter.</div>
+        </div>
+        <div>
+          <h3>Encounter snapshot</h3>
+          <table class="snapshot">
+            <thead><tr><th>Opposition</th><th>Key pressure</th></tr></thead>
+            <tbody>
+              <tr><td>Chief Engineer Wang, level 6</td><td>AC 24 · HP 105 · +17 Strike</td></tr>
+              <tr><td>Two level-3 mephits</td><td>80 combined HP · two breath weapons</td></tr>
+              <tr><td>Level-0 apprentice</td><td>Can intensify the vents</td></tr>
+              <tr><td>Engine room</td><td>Recurring vents · core · forced movement</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="results-heading">
+      <h2 id="results-heading">Modeled outcomes</h2>
+      <p class="section-intro">Each row summarizes 20,000 fights. “Party defeat” means all four PCs became unable to continue before the enemies fell; it does not necessarily mean four confirmed character deaths.</p>
+      <div class="chart-legend" aria-label="Outcome legend">
+        <span class="legend-key"><span class="swatch clean" aria-hidden="true"></span>Clean win</span>
+        <span class="legend-key"><span class="swatch strained" aria-hidden="true"></span>Win after a PC drops</span>
+        <span class="legend-key"><span class="swatch loss" aria-hidden="true"></span>Party defeat</span>
+      </div>
+
+      <div class="scenario">
+        <div class="scenario-name">As written</div>
+        <div class="chart-row"><span>Focused</span><div class="bar" role="img" aria-label="Focused tactics: 8 percent clean win, 38 percent strained win, 54 percent defeat"><span class="bar-clean" style="width:8%"></span><span class="bar-strained" style="width:38%"></span><span class="bar-loss" style="width:54%"></span></div><span class="loss-label">54% defeat</span></div>
+        <div class="chart-row"><span>Boss-first</span><div class="bar" role="img" aria-label="Boss-first tactics: 6 percent clean win, 29 percent strained win, 65 percent defeat"><span class="bar-clean" style="width:6%"></span><span class="bar-strained" style="width:29%"></span><span class="bar-loss" style="width:65%"></span></div><span class="loss-label">65% defeat</span></div>
+      </div>
+
+      <div class="scenario">
+        <div class="scenario-name">Remove one mephit; retain the automatic vents</div>
+        <div class="chart-row"><span>Focused</span><div class="bar" role="img" aria-label="Focused tactics: 23 percent clean win, 53 percent strained win, 24 percent defeat"><span class="bar-clean" style="width:23%"></span><span class="bar-strained" style="width:53%"></span><span class="bar-loss" style="width:24%"></span></div><span class="loss-label">24% defeat</span></div>
+        <div class="chart-row"><span>Boss-first</span><div class="bar" role="img" aria-label="Boss-first tactics: 19 percent clean win, 51 percent strained win, 30 percent defeat"><span class="bar-clean" style="width:19%"></span><span class="bar-strained" style="width:51%"></span><span class="bar-loss" style="width:30%"></span></div><span class="loss-label">30% defeat</span></div>
+      </div>
+
+      <div class="scenario">
+        <div class="scenario-name">One mephit; remove the automatic vents</div>
+        <div class="chart-row"><span>Focused</span><div class="bar" role="img" aria-label="Focused tactics: 26 percent clean win, 54 percent strained win, 20 percent defeat"><span class="bar-clean" style="width:26%"></span><span class="bar-strained" style="width:54%"></span><span class="bar-loss" style="width:20%"></span></div><span class="loss-label">20% defeat</span></div>
+        <div class="chart-row"><span>Boss-first</span><div class="bar" role="img" aria-label="Boss-first tactics: 22 percent clean win, 53 percent strained win, 25 percent defeat"><span class="bar-clean" style="width:22%"></span><span class="bar-strained" style="width:53%"></span><span class="bar-loss" style="width:25%"></span></div><span class="loss-label">25% defeat</span></div>
+      </div>
+
+      <div class="scenario">
+        <div class="scenario-name">Weak Wang; one mephit; retain the automatic vents</div>
+        <div class="chart-row"><span>Focused</span><div class="bar" role="img" aria-label="Focused tactics: 66 percent clean win, 33 percent strained win, 1 percent defeat"><span class="bar-clean" style="width:66%"></span><span class="bar-strained" style="width:33%"></span><span class="bar-loss" style="width:1%"></span></div><span class="loss-label">1% defeat</span></div>
+        <div class="chart-row"><span>Boss-first</span><div class="bar" role="img" aria-label="Boss-first tactics: 62 percent clean win, 36 percent strained win, 2 percent defeat"><span class="bar-clean" style="width:62%"></span><span class="bar-strained" style="width:36%"></span><span class="bar-loss" style="width:2%"></span></div><span class="loss-label">2% defeat</span></div>
+      </div>
+
+      <p class="chart-note"><strong>Focused</strong> means removing mephits first, then the apprentice, then Wang. <strong>Boss-first</strong> represents the narratively tempting choice to concentrate primarily on Wang.</p>
+    </section>
+
+    <section aria-labelledby="why-heading">
+      <h2 id="why-heading">Why the encounter turns against the party</h2>
+      <div class="reason-grid">
+        <article class="reason"><span class="reason-number">01 // INITIATIVE</span><h3>Wang often gets the first meaningful turn</h3><p>With +14 initiative, Wang acts before at least three PCs about 60% of the time and before all four about 39% of the time.</p></article>
+        <article class="reason"><span class="reason-number">02 // OPENING SALVO</span><h3>Three area attacks front-load the damage</h3><p>If Wang and both mephits each catch two targets, their first-round area effects deal roughly 55–60 total party damage before Strikes.</p></article>
+        <article class="reason"><span class="reason-number">03 // ATTRITION</span><h3>The mephits preserve enemy actions</h3><p>Each mephit has 40 HP and flight. Until the party removes them, Wang can keep attacking while two additional enemies cycle breath weapons and claws.</p></article>
+      </div>
+      <div class="impact"><strong>The second mephit matters much more than Panic Valve.</strong> Removing one mephit reduced modeled defeat from 54% to 24%. Interpreting Panic Valve literally so it never doubles the vents changed defeat by only about one percentage point.</div>
+    </section>
+
+    <section aria-labelledby="recommend-heading">
+      <h2 id="recommend-heading">Recommended versions</h2>
+      <p class="section-intro">Choose according to how much campaign-ending risk you actually want, rather than according to the label alone.</p>
+      <div class="recommendations">
+        <article class="recommendation">
+          <span class="outcome">Deadly finale</span>
+          <h3>Keep Wang at level 6; remove one mephit</h3>
+          <p>This preserves Wang as a frightening boss and keeps the arena active. The party wins approximately 70–76% of modeled fights, usually after someone drops.</p>
+          <ul>
+            <li>Wang as written</li>
+            <li>One level-3 mephit</li>
+            <li>The apprentice and automatic vents</li>
+            <li>A visible escape route or surrender condition</li>
+          </ul>
+        </article>
+        <article class="recommendation">
+          <span class="outcome">Conventional Severe</span>
+          <h3>Use weak Wang and one mephit</h3>
+          <p>This produces a small party-defeat chance while still knocking a PC unconscious in roughly one-third of victories.</p>
+          <ul>
+            <li>Wang: 85 HP, AC 22, +15 wrench, DC 22 abilities</li>
+            <li>Reduce Wang’s Strike and unlimited ability damage by 2</li>
+            <li>One level-3 mephit</li>
+            <li>The apprentice and automatic vents</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="callout timing-note"><strong>Fix Panic Valve’s timing:</strong> “The next time the Steam Vents routine occurs before the end of the apprentice’s next turn, it selects two vents instead of one.” The current “rest of the round” wording usually refers to a vent activation that has already happened.</div>
+    </section>
+
+    <section aria-labelledby="method-heading">
+      <h2 id="method-heading">Simulation method and limits</h2>
+      <p>The representative party was a fully rested level-4 Fighter, Rogue, Cleric, and Wizard with normal level-appropriate equipment, four rank-2 heals, three rank-2 offensive spells, and one Hero Point each. The model resolved initiative, degrees of success, multiple attack penalties, healing and dying, breath cooldowns, mephit death bursts, Reactive Strike, core pushes, and probabilistic positioning.</p>
+      <details>
+        <summary>Important modeling assumptions</summary>
+        <ul>
+          <li>Wang used Overclock Boiler frequently when two PCs could plausibly be caught, especially in round 1.</li>
+          <li>The front-line PCs remained more exposed to vents; ranged PCs usually reduced their exposure after reaching the catwalks.</li>
+          <li>Wang’s successful opening Brutal Shove had a limited chance to line a front-liner up with the core.</li>
+          <li>Enemies chose useful targets but did not deliberately execute unconscious PCs.</li>
+          <li>The model did not grant the PCs repeated exploitation of the mephits’ cold weakness or every possible cover bonus.</li>
+          <li>Actual party composition, spell selection, starting distance, foreknowledge, and current resources can move the result substantially.</li>
+        </ul>
+      </details>
+      <p>The percentages are model estimates, not official Pathfinder probabilities. Their value is comparative: they show which encounter elements drive the outcome and how strongly the proposed changes alter it.</p>
+    </section>
+  </main>
+
+  <footer>
+    <div class="site-shell">
+      <p>Prepared as a simulation-based encounter audit for <em>The Engine Room Heist</em>. Pathfinder 2e rules references:</p>
+      <div class="source-links">
+        <a href="https://2e.aonprd.com/Rules.aspx?ID=2716">Combat threats and encounter budgets</a>
+        <a href="https://2e.aonprd.com/Rules.aspx?ID=788">Weak creature adjustments</a>
+        <a href="https://github.com/dballesteros7/moa-toa-chronicles">Moa Toa Chronicles repository</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const shareButton = document.getElementById('share-report');
+    const shareStatus = document.getElementById('share-status');
+
+    const copyWithTemporaryInput = (value) => {
+      const temporaryInput = document.createElement('textarea');
+      temporaryInput.value = value;
+      temporaryInput.setAttribute('readonly', '');
+      temporaryInput.style.position = 'absolute';
+      temporaryInput.style.left = '-9999px';
+      document.body.appendChild(temporaryInput);
+      temporaryInput.select();
+      const copied = document.execCommand('copy');
+      temporaryInput.remove();
+      return copied;
+    };
+
+    shareButton.addEventListener('click', async () => {
+      const shareData = {
+        title: document.title,
+        text: 'Simulation-based Pathfinder 2e balance report for The Engine Room Heist.',
+        url: window.location.href
+      };
+
+      try {
+        if (navigator.share) {
+          try {
+            await navigator.share(shareData);
+            shareStatus.textContent = 'Share menu opened.';
+            return;
+          } catch (error) {
+            if (error instanceof DOMException && error.name === 'AbortError') {
+              shareStatus.textContent = '';
+              return;
+            }
+          }
+        }
+
+        if (navigator.clipboard) {
+          try {
+            await navigator.clipboard.writeText(shareData.url);
+            shareStatus.textContent = 'Link copied.';
+            return;
+          } catch {
+            // Some embedded browsers expose Clipboard without granting access.
+          }
+        }
+
+        shareStatus.textContent = copyWithTemporaryInput(shareData.url)
+          ? 'Link copied.'
+          : 'Copy the address from your browser to share.';
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          shareStatus.textContent = '';
+        } else {
+          shareStatus.textContent = 'Copy the address from your browser to share.';
+        }
+      }
+    });
+  </script>
+</body>
+</html>
