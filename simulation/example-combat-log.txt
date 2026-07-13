@@ -1,0 +1,147 @@
+ENGINE ROOM HEIST — SINGLE-FIGHT TRACE
+Seed: 20260713
+Scenario: As written
+Party tactic: focused
+Party: Fighter HP 64 AC 23, Rogue HP 50 AC 22, Cleric HP 52 AC 20, Wizard HP 42 AC 20
+Enemies: Chief Engineer Wang HP 105 AC 24, Mephit 1 HP 40 AC 19, Mephit 2 HP 40 AC 19, Apprentice HP 15 AC 15
+
+Initiative Fighter: d20 10 + 10 = 20
+Initiative Rogue: d20 9 + 11 = 20
+Initiative Cleric: d20 18 + 9 = 27
+Initiative Wizard: d20 3 + 8 = 11
+Initiative Chief Engineer Wang: d20 16 + 14 = 30
+Initiative Mephit 1: d20 20 + 9 = 29
+Initiative Mephit 2: d20 8 + 9 = 17
+Initiative Apprentice: d20 11 + 4 = 15
+Initiative Steam Vents: fixed 20
+Initiative order: Chief Engineer Wang (30) > Mephit 1 (29) > Cleric (27) > Steam Vents (20) > Fighter (20) > Rogue (20) > Mephit 2 (17) > Apprentice (15) > Wizard (11)
+
+=== ROUND 1 ===
+-- Chief Engineer Wang acts --
+  Wang uses the modeled round-1 Overclock Boiler priority
+  Wang Overclock Boiler targets Rogue, Wizard: 4d6 = 17 raw damage
+  Rogue Reflex save vs Wang Overclock Boiler: d20 16 + 12 = 28 vs DC 24 -> success; 17 raw -> 8 damage
+  Wang Overclock Boiler -> Rogue: 8 damage; HP 50/50 -> 42/50
+  Wizard Reflex save vs Wang Overclock Boiler: d20 3 + 10 = 13 vs DC 24 -> critical failure; 17 raw -> 34 damage
+  Wang Overclock Boiler -> Wizard: 34 damage; HP 42/42 -> 8/42
+  Wang wrench Strike: d20 9 + 17 = 26 vs AC 23 -> success; 2d8+5 = 12; 12 damage after degree
+  Wang wrench Strike -> Fighter: 12 damage; HP 64/64 -> 52/64
+-- Mephit 1 acts --
+  Mephit 1 Breath Weapon targets Wizard, Fighter: 3d6 = 14 raw damage
+  Wizard Reflex save vs Mephit 1 Breath Weapon: d20 11 + 10 = 21 vs DC 19 -> success; 14 raw -> 7 damage
+  Mephit 1 Breath Weapon -> Wizard: 7 damage; HP 8/42 -> 1/42
+  Fighter Reflex save vs Mephit 1 Breath Weapon: d20 7 + 10 = 17 vs DC 19 -> failure; 14 raw -> 14 damage
+  Mephit 1 Breath Weapon -> Fighter: 14 damage; HP 52/64 -> 38/64
+  Mephit 1 Breath Weapon cooldown: 4 rounds
+  Mephit 1 claw: d20 7 + 11 = 18 vs AC 20 -> failure; 0 damage
+-- Cleric acts --
+  Cleric casts rank-2 Heal on Wizard: 2d8+16 = 23; HP 1/42 -> 24/42; wounded 0; 3 slots remain
+-- Steam Vents routine: 1 eruption(s) --
+  Eruption 1 exposure roll 0.596 <= 0.58 -> empty vent area
+-- Fighter acts --
+  Fighter target: Mephit 1
+  Fighter Strike 1: d20 15 + 14 = 29 vs AC 19 -> critical success; 2d8+5 = 15; 30 damage after degree
+  Fighter -> Mephit 1: 30 damage; HP 40/40 -> 10/40
+  Fighter target: Mephit 1
+  Fighter Strike 2: d20 4 + 9 = 13 vs AC 19 -> failure; 0 damage
+-- Rogue acts --
+  Rogue target: Mephit 1; off-guard positioning roll 0.884 < 0.72 -> no
+  Rogue Strike 1: d20 6 + 13 = 19 vs AC 19 -> success; 2d6+4 = 7; 7 damage after degree
+  Rogue -> Mephit 1: 7 damage; HP 10/40 -> 3/40
+  Rogue target: Mephit 1; off-guard positioning roll 0.441 < 0.52 -> yes (-2 AC)
+  Rogue Strike 2: d20 20 + 9 = 29 vs AC 17 -> critical success; 2d6+4 = 7 + 2d6 Sneak Attack = 8; raw total 15; 30 damage after degree
+  Rogue -> Mephit 1: 30 damage; HP 3/40 -> 0/40; DROPPED
+  Explosive Demise catches Rogue: 2d6 = 11
+  Rogue Reflex save vs Explosive Demise: d20 5 + 12 = 17 vs DC 19 -> failure; 11 raw -> 11 damage
+  Explosive Demise -> Rogue: 11 damage; HP 42/50 -> 31/50
+-- Mephit 2 acts --
+  Mephit 2 Breath Weapon targets Cleric, Wizard: 3d6 = 12 raw damage
+  Cleric Reflex save vs Mephit 2 Breath Weapon: d20 11 + 8 = 19 vs DC 19 -> success; 12 raw -> 6 damage
+  Mephit 2 Breath Weapon -> Cleric: 6 damage; HP 52/52 -> 46/52
+  Wizard Reflex save vs Mephit 2 Breath Weapon: d20 10 + 10 = 20 vs DC 19 -> success; 12 raw -> 6 damage
+  Mephit 2 Breath Weapon -> Wizard: 6 damage; HP 24/42 -> 18/42
+  Mephit 2 Breath Weapon cooldown: 4 rounds
+  Mephit 2 claw: d20 4 + 11 = 15 vs AC 22 -> failure; 0 damage
+-- Apprentice acts --
+  Panic Valve choice: tactical roll 0.050 < 0.22 -> sets next round
+  Apprentice hammer opportunity: positioning roll 0.693 < 0.35 -> no target
+-- Wizard acts --
+  Wizard rank-2 spell targets Mephit 2: 4d6 = 10; 2 slots remain
+  Mephit 2 Reflex save vs wizard spell: d20 2 + 11 = 13 vs DC 21 -> failure; 10 raw -> 10 damage
+  Wizard -> Mephit 2: 10 damage; HP 40/40 -> 30/40
+
+=== ROUND 2 ===
+-- Chief Engineer Wang acts --
+  Wang Overclock choice: tactical roll 0.297 < 0.90 -> use it
+  Wang Overclock Boiler targets Fighter, Wizard: 4d6 = 16 raw damage
+  Fighter Reflex save vs Wang Overclock Boiler: d20 9 + 10 = 19 vs DC 24 -> failure; 16 raw -> 16 damage
+  Wang Overclock Boiler -> Fighter: 16 damage; HP 38/64 -> 22/64
+  Wizard Reflex save vs Wang Overclock Boiler: d20 1 + 10 = 11 vs DC 24 -> critical failure; 16 raw -> 32 damage
+  Wang Overclock Boiler -> Wizard: 32 damage; HP 18/42 -> 0/42; DROPPED (dying 2, wounded 0)
+  Wang wrench Strike: d20 15 + 17 = 32 vs AC 23 -> success; 2d8+5 = 13; 13 damage after degree
+  Wang wrench Strike -> Fighter: 13 damage; HP 22/64 -> 9/64
+-- Cleric acts --
+  Cleric casts rank-2 Heal on Wizard: 2d8+16 = 23; HP 0/42 -> 23/42; wounded 1; 2 slots remain
+-- Steam Vents routine: 2 eruption(s) --
+  Eruption 1 exposure roll 0.415 <= 0.58 -> PC exposed
+  Steam Vent catches Cleric: 2d6 = 8
+  Cleric Reflex save vs Steam Vent: d20 3 + 8 = 11 vs DC 19 -> failure; 8 raw -> 8 damage
+  Steam Vent -> Cleric: 8 damage; HP 46/52 -> 38/52
+  Eruption 2 exposure roll 0.813 <= 0.58 -> empty vent area
+-- Fighter acts --
+  Fighter target: Mephit 2
+  Fighter Strike 1: d20 19 + 14 = 33 vs AC 19 -> critical success; 2d8+5 = 19; 38 damage after degree
+  Fighter -> Mephit 2: 38 damage; HP 30/40 -> 0/40; DROPPED
+  Explosive Demise catches Fighter: 2d6 = 6
+  Fighter Reflex save vs Explosive Demise: d20 19 + 10 = 29 vs DC 19 -> critical success; 6 raw -> 0 damage
+  Fighter target: Apprentice
+  Fighter Strike 2: d20 13 + 9 = 22 vs AC 15 -> success; 2d8+5 = 8; 8 damage after degree
+  Fighter -> Apprentice: 8 damage; HP 15/15 -> 7/15
+-- Rogue acts --
+  Rogue target: Apprentice; off-guard positioning roll 0.163 < 0.72 -> yes (-2 AC)
+  Rogue Strike 1: d20 6 + 13 = 19 vs AC 13 -> success; 2d6+4 = 12 + 2d6 Sneak Attack = 4; raw total 16; 16 damage after degree
+  Rogue -> Apprentice: 16 damage; HP 7/15 -> 0/15; DROPPED
+  Rogue target: Chief Engineer Wang; off-guard positioning roll 0.033 < 0.52 -> yes (-2 AC)
+  Rogue Strike 2: d20 20 + 9 = 29 vs AC 22 -> critical success; 2d6+4 = 12 + 2d6 Sneak Attack = 12; raw total 24; 48 damage after degree
+  Rogue -> Chief Engineer Wang: 48 damage; HP 105/105 -> 57/105
+-- Wizard acts --
+  Wizard rank-2 spell targets Chief Engineer Wang: 4d6 = 14; 1 slots remain
+  Chief Engineer Wang Reflex save vs wizard spell: d20 17 + 11 = 28 vs DC 21 -> success; 14 raw -> 7 damage
+  Wizard -> Chief Engineer Wang: 7 damage; HP 57/105 -> 50/105
+
+=== ROUND 3 ===
+-- Chief Engineer Wang acts --
+  Wang Overclock choice: tactical roll 0.459 < 0.90 -> use it
+  Wang Overclock Boiler targets Rogue, Wizard: 4d6 = 17 raw damage
+  Rogue Reflex save vs Wang Overclock Boiler: d20 13 + 12 = 25 vs DC 24 -> success; 17 raw -> 8 damage
+  Wang Overclock Boiler -> Rogue: 8 damage; HP 31/50 -> 23/50
+  Wizard Reflex save vs Wang Overclock Boiler: d20 4 + 10 = 14 vs DC 24 -> critical failure; 17 raw -> 34 damage
+  Wang Overclock Boiler -> Wizard: 34 damage; HP 23/42 -> 0/42; DROPPED (dying 3, wounded 1)
+  Wang wrench Strike: d20 9 + 17 = 26 vs AC 23 -> success; 2d8+5 = 19; 19 damage after degree
+  Wang wrench Strike -> Fighter: 19 damage; HP 9/64 -> 0/64; DROPPED (dying 1, wounded 0)
+-- Cleric acts --
+  Cleric casts rank-2 Heal on Fighter: 2d8+16 = 30; HP 0/64 -> 30/64; wounded 1; 1 slots remain
+-- Steam Vents routine: 1 eruption(s) --
+  Eruption 1 exposure roll 0.004 <= 0.58 -> PC exposed
+  Steam Vent catches Rogue: 2d6 = 3
+  Rogue Reflex save vs Steam Vent: d20 18 + 12 = 30 vs DC 19 -> critical success; 3 raw -> 0 damage
+-- Fighter acts --
+  Fighter target: Chief Engineer Wang
+  Reactive Strike opportunity for Fighter: positioning roll 0.013 < 0.42 -> triggers
+  Wang Reactive Strike: d20 16 + 17 = 33 vs AC 23 -> critical success; 2d8+5 = 14; 28 damage after degree
+  Wang Reactive Strike -> Fighter: 28 damage; HP 30/64 -> 2/64
+  Fighter Strike 1: d20 19 + 14 = 33 vs AC 24 -> success; 2d8+5 = 14; 14 damage after degree
+  Fighter -> Chief Engineer Wang: 14 damage; HP 50/105 -> 36/105
+  Fighter target: Chief Engineer Wang
+  Fighter Strike 2: d20 4 + 9 = 13 vs AC 24 -> critical failure; 0 damage
+-- Rogue acts --
+  Rogue target: Chief Engineer Wang; off-guard positioning roll 0.244 < 0.72 -> yes (-2 AC)
+  Rogue Strike 1: d20 11 + 13 = 24 vs AC 22 -> success; 2d6+4 = 10 + 2d6 Sneak Attack = 9; raw total 19; 19 damage after degree
+  Rogue -> Chief Engineer Wang: 19 damage; HP 36/105 -> 17/105
+  Rogue target: Chief Engineer Wang; off-guard positioning roll 0.271 < 0.52 -> yes (-2 AC)
+  Rogue Strike 2: d20 13 + 9 = 22 vs AC 22 -> success; 2d6+4 = 14 + 2d6 Sneak Attack = 7; raw total 21; 21 damage after degree
+  Rogue -> Chief Engineer Wang: 21 damage; HP 17/105 -> 0/105; DROPPED
+
+RESULT: STRAINED — all enemies defeated after at least one PC dropped
+Party final: Fighter 2/64 HP dropped wounded 1, Rogue 23/50 HP, Cleric 38/52 HP, Wizard 0/42 HP dropped wounded 1
+Enemy final: Chief Engineer Wang 0/105 HP, Mephit 1 0/40 HP, Mephit 2 0/40 HP, Apprentice 0/15 HP

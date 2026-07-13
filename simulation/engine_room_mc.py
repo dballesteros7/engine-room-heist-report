@@ -16,7 +16,7 @@ import argparse
 import json
 import random
 from dataclasses import asdict, dataclass, field
-from typing import Iterable, Literal, Sequence
+from typing import Callable, Iterable, Literal, Sequence
 
 
 Tactic = Literal["focused", "boss-first"]
@@ -70,6 +70,7 @@ class Combatant:
     hp: int = field(init=False)
     dropped_once: bool = False
     dying: int = 0
+    wounded: int = 0
     dead: bool = False
     persistent_fire: int = 0
     breath_cooldown: int = 0
@@ -81,15 +82,27 @@ class Combatant:
     def standing(self) -> bool:
         return self.hp > 0 and not self.dead
 
-    def take_damage(self, amount: int) -> bool:
+    def take_damage(self, amount: int, critical_drop: bool = False) -> bool:
         """Apply damage and return True only when this damage drops the target."""
-        if amount <= 0 or self.dead or self.hp <= 0:
+        if amount <= 0 or self.dead:
+            return False
+        if self.hp <= 0:
+            if self.side == "party":
+                if self.dying > 0:
+                    self.dying += 2 if critical_drop else 1
+                else:
+                    self.dying = (2 if critical_drop else 1) + self.wounded
+                if self.dying >= 4:
+                    self.dead = True
             return False
         self.hp = max(0, self.hp - amount)
         if self.hp == 0:
             self.dropped_once = True
             if self.side == "party":
-                self.dying = max(1, self.dying)
+                dying_value = (2 if critical_drop else 1) + self.wounded
+                self.dying = max(dying_value, self.dying)
+                if self.dying >= 4:
+                    self.dead = True
             else:
                 self.dead = True
             return True
@@ -98,10 +111,11 @@ class Combatant:
     def heal(self, amount: int) -> None:
         if self.dead or amount <= 0:
             return
-        was_dying = self.hp == 0
+        was_dying = self.dying > 0
         self.hp = min(self.max_hp, self.hp + amount)
         if was_dying and self.hp > 0:
             self.dying = 0
+            self.wounded += 1
 
 
 @dataclass
@@ -116,6 +130,11 @@ class FightState:
     panic_round: int = 0
     wang_reaction_used: bool = False
     round_number: int = 0
+    trace: list[str] | None = None
+
+    def log(self, message: str = "") -> None:
+        if self.trace is not None:
+            self.trace.append(message)
 
     def standing_party(self) -> list[Combatant]:
         return [actor for actor in self.party if actor.standing]
@@ -153,20 +172,52 @@ def degree(check: int, modifier: int, dc: int) -> int:
     return result
 
 
+DEGREE_NAMES = ("critical failure", "failure", "success", "critical success")
+
+
 def strike_damage(
     rng: random.Random,
     attack_bonus: int,
     target: Combatant,
     dice: tuple[int, int],
     flat: int,
-) -> tuple[int, bool]:
-    result = degree(d20(rng), attack_bonus, target.ac)
+    log: Callable[[str], None] | None = None,
+    label: str = "Strike",
+    extra_dice: tuple[int, int] | None = None,
+    extra_label: str = "extra damage",
+) -> tuple[int, bool, bool]:
+    check = d20(rng)
+    result = degree(check, attack_bonus, target.ac)
+    total = check + attack_bonus
     if result < 2:
-        return 0, False
-    damage = roll(rng, dice[0], dice[1], flat)
+        if log is not None:
+            log(
+                f"  {label}: d20 {check} + {attack_bonus} = {total} vs "
+                f"AC {target.ac} -> {DEGREE_NAMES[result]}; 0 damage"
+            )
+        return 0, False, False
+    base_damage = roll(rng, dice[0], dice[1], flat)
+    extra_damage = (
+        roll(rng, extra_dice[0], extra_dice[1]) if extra_dice is not None else 0
+    )
+    raw_damage = base_damage + extra_damage
+    damage = raw_damage
     if result == 3:
         damage *= 2
-    return damage, True
+    if log is not None:
+        base_formula = f"{dice[0]}d{dice[1]}" + (f"+{flat}" if flat else "")
+        formula = f"{base_formula} = {base_damage}"
+        if extra_dice is not None:
+            formula += (
+                f" + {extra_dice[0]}d{extra_dice[1]} {extra_label} = "
+                f"{extra_damage}; raw total {raw_damage}"
+            )
+        log(
+            f"  {label}: d20 {check} + {attack_bonus} = {total} vs "
+            f"AC {target.ac} -> {DEGREE_NAMES[result]}; "
+            f"{formula}; {damage} damage after degree"
+        )
+    return damage, True, result == 3
 
 
 def basic_save_damage(
@@ -175,15 +226,27 @@ def basic_save_damage(
     save_name: Literal["fort", "reflex", "will"],
     dc: int,
     raw_damage: int,
-) -> int:
-    result = degree(d20(rng), getattr(target, save_name), dc)
+    log: Callable[[str], None] | None = None,
+    label: str = "basic save",
+) -> tuple[int, bool]:
+    check = d20(rng)
+    modifier = getattr(target, save_name)
+    result = degree(check, modifier, dc)
     if result == 0:
-        return raw_damage * 2
-    if result == 1:
-        return raw_damage
-    if result == 2:
-        return raw_damage // 2
-    return 0
+        damage = raw_damage * 2
+    elif result == 1:
+        damage = raw_damage
+    elif result == 2:
+        damage = raw_damage // 2
+    else:
+        damage = 0
+    if log is not None:
+        log(
+            f"  {target.name} {save_name.title()} {label}: d20 {check} + "
+            f"{modifier} = {check + modifier} vs DC {dc} -> "
+            f"{DEGREE_NAMES[result]}; {raw_damage} raw -> {damage} damage"
+        )
+    return damage, result == 0
 
 
 def make_party() -> list[Combatant]:
@@ -259,7 +322,60 @@ def mephit_death_burst(
         target = choose_enemy_target(state, "mephit")
     if target is not None:
         raw = roll(state.rng, 2, 6)
-        target.take_damage(basic_save_damage(state.rng, target, "reflex", 19, raw))
+        state.log(f"  Explosive Demise catches {target.name}: 2d6 = {raw}")
+        damage, critical_failure = basic_save_damage(
+            state.rng,
+            target,
+            "reflex",
+            19,
+            raw,
+            log=state.log,
+            label="save vs Explosive Demise",
+        )
+        apply_damage(
+            state,
+            target,
+            damage,
+            "Explosive Demise",
+            critical_drop=critical_failure,
+        )
+    else:
+        state.log("  Explosive Demise: no PC is adjacent")
+
+
+def apply_damage(
+    state: FightState,
+    target: Combatant,
+    amount: int,
+    source_label: str,
+    source: Combatant | None = None,
+    ranged: bool = True,
+    critical_drop: bool = False,
+) -> bool:
+    if amount <= 0:
+        return False
+    before = target.hp
+    dying_before = target.dying
+    dropped = target.take_damage(amount, critical_drop=critical_drop)
+    state.log(
+        f"  {source_label} -> {target.name}: {amount} damage; "
+        f"HP {before}/{target.max_hp} -> {target.hp}/{target.max_hp}"
+        + (
+            f"; DROPPED (dying {target.dying}, wounded {target.wounded})"
+            if dropped and target.side == "party"
+            else "; DROPPED"
+            if dropped
+            else ""
+        )
+        + (
+            f"; dying {dying_before} -> {target.dying}"
+            if target.side == "party" and before == 0
+            else ""
+        )
+    )
+    if dropped and target.role == "mephit":
+        mephit_death_burst(state, source, ranged)
+    return dropped
 
 
 def damage_enemy(
@@ -269,9 +385,14 @@ def damage_enemy(
     source: Combatant | None,
     ranged: bool,
 ) -> None:
-    dropped = target.take_damage(amount)
-    if dropped and target.role == "mephit":
-        mephit_death_burst(state, source, ranged)
+    apply_damage(
+        state,
+        target,
+        amount,
+        source.name if source is not None else "damage",
+        source=source,
+        ranged=ranged,
+    )
 
 
 def wang_reactive_strike(state: FightState, mover: Combatant) -> None:
@@ -285,24 +406,34 @@ def wang_reactive_strike(state: FightState, mover: Combatant) -> None:
             reaction_chance += 0.45
         else:
             reaction_chance += 0.40 if active_adds >= 2 else 0.10
-    if (
-        wang is None
-        or not wang.standing
-        or state.wang_reaction_used
-        or not mover.standing
-        or state.rng.random() >= reaction_chance
-    ):
+    if wang is None or not wang.standing or state.wang_reaction_used or not mover.standing:
+        return
+    opportunity_roll = state.rng.random()
+    state.log(
+        f"  Reactive Strike opportunity for {mover.name}: positioning roll "
+        f"{opportunity_roll:.3f} < {reaction_chance:.2f} -> "
+        f"{'triggers' if opportunity_roll < reaction_chance else 'no trigger'}"
+    )
+    if opportunity_roll >= reaction_chance:
         return
     state.wang_reaction_used = True
     weak = state.scenario.weak_wang
-    damage, _ = strike_damage(
+    damage, _, critical = strike_damage(
         state.rng,
         15 if weak else 17,
         mover,
         (2, 8),
         3 if weak else 5,
+        log=state.log,
+        label="Wang Reactive Strike",
     )
-    mover.take_damage(damage)
+    apply_damage(
+        state,
+        mover,
+        damage,
+        "Wang Reactive Strike",
+        critical_drop=critical,
+    )
 
 
 def fighter_turn(state: FightState, actor: Combatant) -> None:
@@ -311,12 +442,19 @@ def fighter_turn(state: FightState, actor: Combatant) -> None:
         if not targets or not actor.standing:
             return
         target = targets[0]
+        state.log(f"  Fighter target: {target.name}")
         if target.role == "wang" and attack_index == 0:
             wang_reactive_strike(state, actor)
             if not actor.standing:
                 return
-        damage, _ = strike_damage(
-            state.rng, 14 - 5 * attack_index, target, (2, 8), 5
+        damage, _, _ = strike_damage(
+            state.rng,
+            14 - 5 * attack_index,
+            target,
+            (2, 8),
+            5,
+            log=state.log,
+            label=f"Fighter Strike {attack_index + 1}",
         )
         damage_enemy(state, target, damage, actor, ranged=False)
 
@@ -331,16 +469,29 @@ def rogue_turn(state: FightState, actor: Combatant) -> None:
             wang_reactive_strike(state, actor)
             if not actor.standing:
                 return
-        off_guard = state.rng.random() < (0.72 if attack_index == 0 else 0.52)
+        off_guard_chance = 0.72 if attack_index == 0 else 0.52
+        off_guard_roll = state.rng.random()
+        off_guard = off_guard_roll < off_guard_chance
+        state.log(
+            f"  Rogue target: {target.name}; off-guard positioning roll "
+            f"{off_guard_roll:.3f} < {off_guard_chance:.2f} -> "
+            f"{'yes (-2 AC)' if off_guard else 'no'}"
+        )
         original_ac = target.ac
         if off_guard:
             target.ac -= 2
-        damage, hit = strike_damage(
-            state.rng, 13 - 4 * attack_index, target, (2, 6), 4
+        damage, _, _ = strike_damage(
+            state.rng,
+            13 - 4 * attack_index,
+            target,
+            (2, 6),
+            4,
+            log=state.log,
+            label=f"Rogue Strike {attack_index + 1}",
+            extra_dice=(2, 6) if off_guard else None,
+            extra_label="Sneak Attack",
         )
         target.ac = original_ac
-        if hit and off_guard:
-            damage += roll(state.rng, 2, 6)
         damage_enemy(state, target, damage, actor, ranged=False)
 
 
@@ -354,14 +505,29 @@ def cleric_turn(state: FightState, actor: Combatant) -> None:
         ]
         if downed or injured:
             target = min(downed or injured, key=lambda ally: ally.hp / ally.max_hp)
-            target.heal(roll(state.rng, 2, 8, 16))
+            healing = roll(state.rng, 2, 8, 16)
+            before = target.hp
+            target.heal(healing)
             state.heal_slots -= 1
+            state.log(
+                f"  Cleric casts rank-2 Heal on {target.name}: 2d8+16 = {healing}; "
+                f"HP {before}/{target.max_hp} -> {target.hp}/{target.max_hp}; "
+                f"wounded {target.wounded}; {state.heal_slots} slots remain"
+            )
             return
     targets = ordered_enemy_targets(state)
     if not targets:
         return
     target = targets[0]
-    damage, _ = strike_damage(state.rng, 12, target, (3, 4), 4)
+    damage, _, _ = strike_damage(
+        state.rng,
+        12,
+        target,
+        (3, 4),
+        4,
+        log=state.log,
+        label="Cleric spell attack",
+    )
     damage_enemy(state, target, damage, actor, ranged=True)
 
 
@@ -385,21 +551,45 @@ def wizard_turn(state: FightState, actor: Combatant) -> None:
         return
     if state.wizard_slots > 0:
         raw = roll(state.rng, 4, 6)
+        state.log(
+            f"  Wizard rank-2 spell targets {', '.join(target.name for target in targets)}: "
+            f"4d6 = {raw}; {state.wizard_slots - 1} slots remain"
+        )
         for target in list(targets):
-            damage = basic_save_damage(state.rng, target, "reflex", 21, raw)
+            damage, _ = basic_save_damage(
+                state.rng,
+                target,
+                "reflex",
+                21,
+                raw,
+                log=state.log,
+                label="save vs wizard spell",
+            )
             damage_enemy(state, target, damage, actor, ranged=True)
         state.wizard_slots -= 1
     else:
         target = targets[0]
         raw = roll(state.rng, 3, 4, 4)
-        damage = basic_save_damage(state.rng, target, "reflex", 21, raw)
+        state.log(f"  Wizard cantrip targets {target.name}: 3d4+4 = {raw}")
+        damage, _ = basic_save_damage(
+            state.rng,
+            target,
+            "reflex",
+            21,
+            raw,
+            log=state.log,
+            label="save vs wizard cantrip",
+        )
         damage_enemy(state, target, damage, actor, ranged=True)
 
 
 def recovery_check(state: FightState, actor: Combatant) -> None:
     if actor.hp > 0 or actor.dead:
         return
-    result = degree(d20(state.rng), 0, 10 + actor.dying)
+    check = d20(state.rng)
+    dc = 10 + actor.dying
+    result = degree(check, 0, dc)
+    before = actor.dying
     if result == 3:
         actor.dying = max(0, actor.dying - 2)
     elif result == 2:
@@ -408,19 +598,34 @@ def recovery_check(state: FightState, actor: Combatant) -> None:
         actor.dying += 1
     else:
         actor.dying += 2
+    if before > 0 and actor.dying == 0:
+        actor.wounded += 1
     if actor.dying >= 4:
         actor.dead = True
+    state.log(
+        f"  {actor.name} recovery: d20 {check} vs DC {dc} -> "
+        f"{DEGREE_NAMES[result]}; dying {before} -> {actor.dying}; "
+        f"wounded {actor.wounded}"
+        + ("; DEAD" if actor.dead else "")
+    )
 
 
 def persistent_damage(state: FightState, actor: Combatant) -> None:
-    if not actor.standing or actor.persistent_fire <= 0:
+    if actor.dead or actor.persistent_fire <= 0:
         return
-    actor.take_damage(roll(state.rng, actor.persistent_fire, 6))
-    if d20(state.rng) >= 15:
+    damage = roll(state.rng, actor.persistent_fire, 6)
+    apply_damage(state, actor, damage, "persistent fire")
+    flat_check = d20(state.rng)
+    state.log(
+        f"  {actor.name} persistent recovery flat check: d20 {flat_check} vs DC 15 -> "
+        f"{'ends' if flat_check >= 15 else 'continues'}"
+    )
+    if flat_check >= 15:
         actor.persistent_fire = 0
 
 
 def party_turn(state: FightState, actor: Combatant) -> None:
+    state.log(f"-- {actor.name} acts --")
     if not actor.standing:
         recovery_check(state, actor)
         return
@@ -441,12 +646,32 @@ def apply_area(
     dice: tuple[int, int],
     dc: int,
     damage_adjustment: int = 0,
+    label: str = "area effect",
 ) -> None:
+    targets = list(targets)
     raw = max(1, roll(state.rng, dice[0], dice[1]) + damage_adjustment)
-    for target in list(targets):
+    adjustment = f"{damage_adjustment:+d}" if damage_adjustment else ""
+    state.log(
+        f"  {label} targets {', '.join(target.name for target in targets)}: "
+        f"{dice[0]}d{dice[1]}{adjustment} = {raw} raw damage"
+    )
+    for target in targets:
         if target.standing:
-            target.take_damage(
-                basic_save_damage(state.rng, target, "reflex", dc, raw)
+            damage, critical_failure = basic_save_damage(
+                state.rng,
+                target,
+                "reflex",
+                dc,
+                raw,
+                log=state.log,
+                label=f"save vs {label}",
+            )
+            apply_damage(
+                state,
+                target,
+                damage,
+                label,
+                critical_drop=critical_failure,
             )
 
 
@@ -468,9 +693,19 @@ def wang_turn(state: FightState, actor: Combatant) -> None:
         return
     weak = state.scenario.weak_wang
     overclock_frequency = 0.88 if weak else 0.90
-    use_overclock = len(party) >= 2 and (
-        state.round_number == 1 or state.rng.random() < overclock_frequency
-    )
+    if len(party) < 2:
+        use_overclock = False
+        state.log("  Wang cannot catch two standing PCs with Overclock Boiler")
+    elif state.round_number == 1:
+        use_overclock = True
+        state.log("  Wang uses the modeled round-1 Overclock Boiler priority")
+    else:
+        overclock_roll = state.rng.random()
+        use_overclock = overclock_roll < overclock_frequency
+        state.log(
+            f"  Wang Overclock choice: tactical roll {overclock_roll:.3f} < "
+            f"{overclock_frequency:.2f} -> {'use it' if use_overclock else 'use Strikes'}"
+        )
     if use_overclock:
         apply_area(
             state,
@@ -478,44 +713,77 @@ def wang_turn(state: FightState, actor: Combatant) -> None:
             (4, 6),
             22 if weak else 24,
             -2 if weak else 0,
+            label="Wang Overclock Boiler",
         )
         target = choose_enemy_target(state, "wang")
         if target is not None:
-            damage, _ = strike_damage(
+            damage, _, critical = strike_damage(
                 state.rng,
                 15 if weak else 17,
                 target,
                 (2, 8),
                 3 if weak else 5,
+                log=state.log,
+                label="Wang wrench Strike",
             )
-            target.take_damage(damage)
+            apply_damage(
+                state,
+                target,
+                damage,
+                "Wang wrench Strike",
+                critical_drop=critical,
+            )
         return
 
     target = choose_enemy_target(state, "wang")
     if target is None:
         return
-    damage, hit = strike_damage(
+    damage, hit, critical = strike_damage(
         state.rng,
         15 if weak else 17,
         target,
         (2, 8),
         3 if weak else 5,
+        log=state.log,
+        label="Wang Brutal Shove",
     )
-    target.take_damage(damage)
+    apply_damage(
+        state,
+        target,
+        damage,
+        "Wang Brutal Shove",
+        critical_drop=critical,
+    )
     core_chance = 0.20
-    if hit and target.standing and state.rng.random() < core_chance:
-        target.take_damage(roll(state.rng, 2, 6))
-        target.persistent_fire = 1
+    if hit and target.standing:
+        core_roll = state.rng.random()
+        state.log(
+            f"  Core alignment after shove: positioning roll {core_roll:.3f} < "
+            f"{core_chance:.2f} -> {'into core' if core_roll < core_chance else 'safe square'}"
+        )
+        if core_roll < core_chance:
+            core_damage = roll(state.rng, 2, 6)
+            apply_damage(state, target, core_damage, "engine core")
+            target.persistent_fire = 1
+            state.log(f"  {target.name} gains 1d6 persistent fire")
     target = choose_enemy_target(state, "wang")
     if target is not None:
-        damage, _ = strike_damage(
+        damage, _, critical = strike_damage(
             state.rng,
             10 if weak else 12,
             target,
             (2, 8),
             3 if weak else 5,
+            log=state.log,
+            label="Wang second wrench Strike (MAP -5)",
         )
-        target.take_damage(damage)
+        apply_damage(
+            state,
+            target,
+            damage,
+            "Wang second wrench Strike",
+            critical_drop=critical,
+        )
 
 
 def mephit_turn(state: FightState, actor: Combatant) -> None:
@@ -524,40 +792,112 @@ def mephit_turn(state: FightState, actor: Combatant) -> None:
         # than defaulting to the front line.
         targets = state.standing_party()
         state.rng.shuffle(targets)
-        apply_area(state, targets[:2], (3, 6), 19)
+        apply_area(
+            state,
+            targets[:2],
+            (3, 6),
+            19,
+            label=f"{actor.name} Breath Weapon",
+        )
         actor.breath_cooldown = state.rng.randint(1, 4)
+        state.log(
+            f"  {actor.name} Breath Weapon cooldown: {actor.breath_cooldown} rounds"
+        )
         target = choose_enemy_target(state, "mephit")
         if target is not None:
-            damage, _ = strike_damage(state.rng, 11, target, (1, 6), 1)
-            target.take_damage(damage + (roll(state.rng, 1, 6) if damage else 0))
+            damage, _, critical = strike_damage(
+                state.rng,
+                11,
+                target,
+                (1, 6),
+                1,
+                log=state.log,
+                label=f"{actor.name} claw",
+                extra_dice=(1, 6),
+                extra_label="fire",
+            )
+            apply_damage(
+                state,
+                target,
+                damage,
+                f"{actor.name} claw",
+                critical_drop=critical,
+            )
         return
 
     if actor.breath_cooldown > 0:
+        before = actor.breath_cooldown
         actor.breath_cooldown -= 1
-    for attack_bonus in (11, 7, 3):
+        state.log(
+            f"  {actor.name} Breath Weapon cooldown: {before} -> "
+            f"{actor.breath_cooldown}; uses claws"
+        )
+    for attack_index, attack_bonus in enumerate((11, 7, 3), start=1):
         target = choose_enemy_target(state, "mephit")
         if target is None:
             return
-        damage, _ = strike_damage(state.rng, attack_bonus, target, (1, 6), 1)
-        target.take_damage(damage + (roll(state.rng, 1, 6) if damage else 0))
+        damage, _, critical = strike_damage(
+            state.rng,
+            attack_bonus,
+            target,
+            (1, 6),
+            1,
+            log=state.log,
+            label=f"{actor.name} claw {attack_index}",
+            extra_dice=(1, 6),
+            extra_label="fire",
+        )
+        apply_damage(
+            state,
+            target,
+            damage,
+            f"{actor.name} claw",
+            critical_drop=critical,
+        )
 
 
 def apprentice_turn(state: FightState, actor: Combatant) -> None:
     # Panic Valve competes with movement and self-preservation. The timing fix
     # proposed in the report is represented as an occasional extra eruption on
     # the following round rather than a guaranteed second vent every round.
-    if state.scenario.automatic_vents and state.rng.random() < 0.22:
-        state.panic_round = state.round_number + 1
-    if state.rng.random() < 0.35:
+    if state.scenario.automatic_vents:
+        panic_roll = state.rng.random()
+        state.log(
+            f"  Panic Valve choice: tactical roll {panic_roll:.3f} < 0.22 -> "
+            f"{'sets next round' if panic_roll < 0.22 else 'not used'}"
+        )
+        if panic_roll < 0.22:
+            state.panic_round = state.round_number + 1
+    hammer_roll = state.rng.random()
+    state.log(
+        f"  Apprentice hammer opportunity: positioning roll {hammer_roll:.3f} < "
+        f"0.35 -> {'attack' if hammer_roll < 0.35 else 'no target'}"
+    )
+    if hammer_roll < 0.35:
         target = choose_enemy_target(state, "apprentice")
         if target is not None:
-            damage, _ = strike_damage(state.rng, 6, target, (1, 6), 0)
-            target.take_damage(damage)
+            damage, _, critical = strike_damage(
+                state.rng,
+                6,
+                target,
+                (1, 6),
+                0,
+                log=state.log,
+                label="Apprentice light hammer",
+            )
+            apply_damage(
+                state,
+                target,
+                damage,
+                "Apprentice light hammer",
+                critical_drop=critical,
+            )
 
 
 def enemy_turn(state: FightState, actor: Combatant) -> None:
     if not actor.standing:
         return
+    state.log(f"-- {actor.name} acts --")
     if actor.role == "wang":
         wang_turn(state, actor)
     elif actor.role == "mephit":
@@ -572,47 +912,129 @@ def vent_routine(state: FightState) -> None:
     eruptions = 2 if state.panic_round == state.round_number else 1
     if state.panic_round <= state.round_number:
         state.panic_round = 0
-    for _ in range(eruptions):
+    state.log(f"-- Steam Vents routine: {eruptions} eruption(s) --")
+    for eruption in range(1, eruptions + 1):
         party = state.standing_party()
-        if not party or state.rng.random() > 0.58:
+        if not party:
+            return
+        exposure_roll = state.rng.random()
+        state.log(
+            f"  Eruption {eruption} exposure roll {exposure_roll:.3f} <= 0.58 -> "
+            f"{'PC exposed' if exposure_roll <= 0.58 else 'empty vent area'}"
+        )
+        if exposure_roll > 0.58:
             continue
         target = weighted_choice(
             state.rng, party, lambda actor: 1.75 if actor.role == "front" else 0.75
         )
         raw = roll(state.rng, 2, 6)
-        target.take_damage(
-            basic_save_damage(state.rng, target, "reflex", 19, raw)
+        state.log(f"  Steam Vent catches {target.name}: 2d6 = {raw}")
+        damage, critical_failure = basic_save_damage(
+            state.rng,
+            target,
+            "reflex",
+            19,
+            raw,
+            log=state.log,
+            label="save vs Steam Vent",
+        )
+        apply_damage(
+            state,
+            target,
+            damage,
+            "Steam Vent",
+            critical_drop=critical_failure,
         )
 
 
 def initiative_order(state: FightState) -> list[tuple[int, Combatant | None]]:
     entries: list[tuple[int, Combatant | None]] = []
     for actor in [*state.party, *state.enemies]:
-        entries.append((d20(state.rng) + actor.initiative, actor))
+        check = d20(state.rng)
+        total = check + actor.initiative
+        state.log(
+            f"Initiative {actor.name}: d20 {check} + {actor.initiative} = {total}"
+        )
+        entries.append((total, actor))
     if state.scenario.automatic_vents:
         entries.append((20, None))
+        state.log("Initiative Steam Vents: fixed 20")
     state.rng.shuffle(entries)
-    return sorted(entries, key=lambda entry: entry[0], reverse=True)
+    order = sorted(entries, key=lambda entry: entry[0], reverse=True)
+    state.log(
+        "Initiative order: "
+        + " > ".join(
+            f"{actor.name if actor is not None else 'Steam Vents'} ({score})"
+            for score, actor in order
+        )
+    )
+    return order
 
 
-def fight(seed: int, scenario: Scenario, tactic: Tactic) -> Outcome:
+def fight(
+    seed: int,
+    scenario: Scenario,
+    tactic: Tactic,
+    trace: list[str] | None = None,
+) -> Outcome:
     state = FightState(
         rng=random.Random(seed),
         scenario=scenario,
         tactic=tactic,
         party=make_party(),
         enemies=make_enemies(scenario),
+        trace=trace,
     )
+    state.log("ENGINE ROOM HEIST — SINGLE-FIGHT TRACE")
+    state.log(f"Seed: {seed}")
+    state.log(f"Scenario: {scenario.label}")
+    state.log(f"Party tactic: {tactic}")
+    state.log(
+        "Party: "
+        + ", ".join(f"{actor.name} HP {actor.hp} AC {actor.ac}" for actor in state.party)
+    )
+    state.log(
+        "Enemies: "
+        + ", ".join(
+            f"{actor.name} HP {actor.hp} AC {actor.ac}" for actor in state.enemies
+        )
+    )
+    state.log("")
     order = initiative_order(state)
+
+    def finish(outcome: Outcome, reason: str) -> Outcome:
+        state.log("")
+        state.log(f"RESULT: {outcome.upper()} — {reason}")
+        state.log(
+            "Party final: "
+            + ", ".join(
+                f"{actor.name} {actor.hp}/{actor.max_hp} HP"
+                + (" dead" if actor.dead else "")
+                + (" dropped" if actor.dropped_once else "")
+                + (f" wounded {actor.wounded}" if actor.wounded else "")
+                for actor in state.party
+            )
+        )
+        state.log(
+            "Enemy final: "
+            + ", ".join(
+                f"{actor.name} {actor.hp}/{actor.max_hp} HP" for actor in state.enemies
+            )
+        )
+        return outcome
 
     for round_number in range(1, 16):
         state.round_number = round_number
         state.wang_reaction_used = False
+        state.log("")
+        state.log(f"=== ROUND {round_number} ===")
         for _, actor in order:
             if not state.active_enemies():
-                return "strained" if any(pc.dropped_once for pc in state.party) else "clean"
+                if any(pc.dropped_once for pc in state.party):
+                    return finish("strained", "all enemies defeated after at least one PC dropped")
+                return finish("clean", "all enemies defeated without a PC dropping")
             if not state.standing_party():
-                return "defeat"
+                return finish("defeat", "all four PCs are unable to continue")
             if actor is None:
                 vent_routine(state)
             elif actor.side == "party":
@@ -621,7 +1043,7 @@ def fight(seed: int, scenario: Scenario, tactic: Tactic) -> Outcome:
                 enemy_turn(state, actor)
 
     # A 15-round stalemate is treated conservatively as a defeat.
-    return "defeat"
+    return finish("defeat", "15-round limit reached")
 
 
 def initiative_estimate(trials: int, seed: int) -> dict[str, float]:
@@ -663,7 +1085,7 @@ def run_suite(trials: int, seed: int) -> dict:
                 }
             )
     return {
-        "model": "engine-room-heist-mc-v1",
+        "model": "engine-room-heist-mc-v1.1",
         "seed": seed,
         "trials_per_row": trials,
         "initiative": initiative_estimate(trials, seed ^ 0xA11CE),
@@ -697,6 +1119,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--trials", type=int, default=20_000, help="fights per row")
     parser.add_argument("--seed", type=int, default=20_260_713, help="master RNG seed")
     parser.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    parser.add_argument(
+        "--trace",
+        action="store_true",
+        help="print a detailed log for one fight instead of running the suite",
+    )
+    parser.add_argument(
+        "--scenario",
+        choices=[scenario.slug for scenario in SCENARIOS],
+        default="as-written",
+        help="scenario used with --trace",
+    )
+    parser.add_argument(
+        "--tactic",
+        choices=("focused", "boss-first"),
+        default="focused",
+        help="party target priority used with --trace",
+    )
     args = parser.parse_args()
     if args.trials < 1:
         parser.error("--trials must be positive")
@@ -705,6 +1144,12 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    if args.trace:
+        scenario = next(item for item in SCENARIOS if item.slug == args.scenario)
+        trace: list[str] = []
+        fight(args.seed, scenario, args.tactic, trace=trace)
+        print("\n".join(trace))
+        return
     report = run_suite(args.trials, args.seed)
     if args.json:
         print(json.dumps(report, indent=2))
